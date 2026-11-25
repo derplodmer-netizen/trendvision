@@ -168,3 +168,30 @@ def result_picture(*, symbol: str, is_otc: bool, direction: str, result: str, en
     _cell(d, p, 276 * S, cw, 76 * S, "Вход", _fmt(entry, digits))
     _cell(d, p + cw + 10 * S, 276 * S, cw, 76 * S, "Экспирация", _fmt(close, digits))
     return _jpeg(_place(bg, card, 770, 160, 2))
+
+
+def day_picture(*, day: str, win: int, loss: int, refund: int, pairs: list[tuple[str, int, int]]) -> bytes:
+    """Results of the day for the channel: counts, win rate and the most used pairs (wins / losses each)."""
+    bg = Image.open(BG / "day.jpg")
+    W, H = 430, 470
+    card, d = _card(W, H)
+    p = 28 * S
+    d.text((p, 26 * S), f"Итоги за {day}", font=font("InterTight-700", 26), fill=WHITE)
+    d.text((p, 60 * S), "сигналы Trend Radar · цена BinoDex", font=font("InterTight-500", 17), fill=MUTED)
+    n = win + loss
+    rate = f"{round(win / n * 100)}%" if n else "—"
+    d.text((p, 96 * S), rate, font=font("InterTight-800", 64), fill=LIME if n and win >= loss else (RED if n else WHITE))
+    d.text((p, 172 * S), f"в плюс: {win} из {n}" + (f" · возвратов: {refund}" if refund else ""),
+           font=font("InterTight-600", 20), fill=SUB)
+    cw = (W * S - 2 * p - 10 * S) // 2
+    _cell(d, p, 212 * S, cw, 76 * S, "В плюс", str(win))
+    _cell(d, p + cw + 10 * S, 212 * S, cw, 76 * S, "В минус", str(loss))
+    y = 312 * S
+    d.text((p, y), "Пары дня", font=font("InterTight-600", 18), fill=MUTED)
+    y += 30 * S
+    for name, w, l in pairs[:3]:
+        d.text((p, y), name, font=font("InterTight-600", 20), fill=WHITE)
+        d.text((W * S - p, y), f"+{w} / −{l}", font=font("JetBrainsMono-700", 18),
+               fill=LIME if w >= l else RED, anchor="ra")
+        y += 34 * S
+    return _jpeg(_place(bg, card, 770, 110, -2))

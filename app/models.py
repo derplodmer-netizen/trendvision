@@ -139,3 +139,15 @@ class KV(Base):
 
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[str] = mapped_column(Text, default="")
+
+
+class ReminderLog(Base):
+    """Funnel reminders already sent (or skipped) per person: each key goes out once."""
+    __tablename__ = "reminders"
+    __table_args__ = (UniqueConstraint("user_id", "key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    key: Mapped[str] = mapped_column(String(24))
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    skipped: Mapped[bool] = mapped_column(default=False)

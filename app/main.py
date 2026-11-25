@@ -14,6 +14,8 @@ from . import db
 from .binodex.market import MarketClient
 from .binodex.partner_api import PartnerApi
 from .config import get_settings
+from .reminders import reminders_forever
+from .reports import reports_forever
 from .signal_engine import SignalEngine
 from .web import create_app
 
@@ -38,7 +40,8 @@ async def main() -> None:
     app = create_app(deliver=lambda out: botmod.deliver(bot, out))
     server = uvicorn.Server(uvicorn.Config(app, host=cfg.http_host, port=cfg.http_port, log_level="info"))
     dp = botmod.build_dispatcher()
-    tasks = [server.serve(), dp.start_polling(bot), engine.run_forever()]
+    tasks = [server.serve(), dp.start_polling(bot), engine.run_forever(), reminders_forever(bot),
+             reports_forever(bot)]
     if partner is not None:
         tasks.append(botmod.recheck_forever(bot))
     try:

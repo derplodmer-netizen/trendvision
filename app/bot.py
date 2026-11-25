@@ -80,6 +80,13 @@ async def show(bot: Bot, s, cfg: Settings, u: User, step: str | None = None, not
             pass
 
 
+@router.message(Command("myid"))
+async def on_myid(m: Message) -> None:
+    """Your Telegram id — put it into ADMIN_IDS to get the evening report."""
+    await m.answer(f"🆔 Твой Telegram ID: <code>{m.from_user.id}</code>\n"
+                   f"Впиши его в .env: <code>ADMIN_IDS=[{m.from_user.id}]</code> — и бот будет присылать вечерний отчёт.")
+
+
 @router.message(Command("reset"))
 async def on_reset(m: Message, bot: Bot) -> None:
     """Test mode (TEST_ACCOUNTS set) or an admin: walk the funnel again from the start."""
@@ -212,6 +219,33 @@ async def on_sub_check(c: CallbackQuery, bot: Bot) -> None:
         u, _ = await get_or_create_user(s, c.from_user.id, c.from_user.username or "")
         await check_subscription(c, bot, s, cfg, u)
         await s.commit()
+
+
+@router.callback_query(F.data.startswith("faq:"))
+async def on_faq(c: CallbackQuery, bot: Bot) -> None:
+    """FAQ and "where is my ID": a transient screen with a way back to the current step."""
+    cfg = get_settings()
+    what = c.data.split(":", 1)[1]
+    async with db.session() as s:
+        u, _ = await get_or_create_user(s, c.from_user.id, c.from_user.username or "")
+        if what == "back":
+            await show(bot, s, cfg, u, "menu" if u.step == "access" else "register" if u.step == "manual" else u.step)
+        else:
+            if what == "id":
+                await log_event(s, u, "find_id")
+            text = await get_text(s, u.lang, "find_id" if what == "id" else "faq", u.ab,
+                                  min_dep=f"{cfg.min_deposit_usd:g}")
+            kb = KB(inline_keyboard=[[B(text=await get_text(s, u.lang, "btn_back", u.ab), callback_data="faq:back")]])
+            old = list(u.msg_ids or [])
+            msg = await send(bot, u.id, text, kb, "find_id" if what == "id" else None)
+            u.msg_ids = [msg.message_id]
+            for mid in old:
+                try:
+                    await bot.delete_message(u.id, mid)
+                except TelegramBadRequest:
+                    pass
+        await s.commit()
+    await c.answer()
 
 
 @router.callback_query(F.data == "check:dep")
@@ -483,8 +517,8 @@ async def result_photo(sig: Signal) -> tuple[str | None, bytes | None]:
 
 
 async def push_signal(bot: Bot, sig: Signal) -> int:
-    """Strong signal -> every user who pressed /start and did not mute them, within the daily cap,
-    outside quiet hours. Newcomers get it as a test with a "Get access" button."""
+    """Strong signal -> users with access who keep notifications on, within the daily cap, outside quiet hours.
+    Newcomers get no signals in private: the channel shows them the results, reminders bring them back."""
     cfg = get_settings()
     if quiet_now(cfg):
         return 0
@@ -495,8 +529,8 @@ async def push_signal(bot: Bot, sig: Signal) -> int:
                                     .join(Signal, Signal.id == Delivery.signal_id)
                                     .where(Delivery.created_at >= day_ago, Signal.source == "broadcast")
                                     .group_by(Delivery.user_id))).all())
-        # everyone who pressed /start: for newcomers a strong signal + its result is the best demo of the bot
-        users = (await s.execute(select(User).where(User.notify.is_(True), User.blocked.is_(False)))).scalars().all()
+        users = (await s.execute(select(User).where(User.step == "access", User.notify.is_(True),
+                                                    User.blocked.is_(False)))).scalars().all()
         for u in users:
             if got.get(u.id, 0) >= cfg.push_per_day:
                 continue

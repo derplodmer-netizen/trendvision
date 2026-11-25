@@ -254,3 +254,20 @@ async def due_rechecks(s, cfg: Settings) -> list[User]:
         and_(User.linked_at >= recent, User.checked_at <= now - timedelta(minutes=cfg.recheck_recent_min)),
         User.checked_at <= now - timedelta(hours=cfg.recheck_all_hours)))
     return list((await s.execute(q.limit(200))).scalars())
+
+
+async def has_low_balance(s, user: User, partner, threshold: float) -> bool:
+    """Partner API trader card "balance" below the threshold. False when unknown (no card, no field, API error)."""
+    from .binodex.partner_api import PartnerApiError
+    try:
+        trader = await partner.trader(int(user.acc_id))
+    except (PartnerApiError, ValueError) as exc:
+        log.info("balance check %s: %s", user.id, getattr(exc, "message", exc))
+        return False
+    user.checked_at = utcnow()
+    if not trader or trader.get("balance") in (None, ""):
+        return False
+    try:
+        return float(str(trader["balance"]).replace(",", ".")) < threshold
+    except ValueError:
+        return False

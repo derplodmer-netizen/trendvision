@@ -83,6 +83,17 @@ class Settings(BaseSettings):
     def gate(self) -> bool:
         return bool(self.channel or self.channel_url)
 
+    # Evening report to ADMIN_IDS (funnel by source, signal results, a picture for the channel)
+    report_time: str = "21:00"
+
+    # Retention for users with access: inactive 3 / 7 / 14 days, low BinoDex balance (Partner API "balance")
+    low_balance_usd: float = 10.0
+    low_balance_every_days: int = 5
+
+    # Follow-up reminders for people who stopped on a funnel step (see app/reminders.py)
+    reminders_enabled: bool = True
+    reminders_per_day: int = 2
+
     # Test accounts for walking the funnel without a real BinoDex account: "ID:reg,ID:dep"
     # (reg = registered without a deposit, dep = with a deposit). Also enables /reset for everyone.
     # Leave EMPTY in production.

@@ -203,18 +203,22 @@ async def render(s, cfg: Settings, u: User, step: str | None = None, note: str =
         return note + "\n\n" + text if note else text
 
     if step == "welcome":
-        if cfg.gate:                        # subscription gate
-            return with_note(await t("welcome")), _kb([[await _btn(s, u, "btn_subscribe", url=cfg.channel_link)],
+        if cfg.gate:                        # subscription gate; YouTube / Facebook traffic gets its own greeting
+            src = (u.tag or "").lower()
+            key = "welcome_yt" if src.startswith("yt") else "welcome_fb" if src.startswith("fb") else "welcome"
+            return with_note(await t(key)), _kb([[await _btn(s, u, "btn_subscribe", url=cfg.channel_link)],
                                                        [await _btn(s, u, "btn_subscribed", "sub:check")], sup])
         return with_note(await t("welcome_nogate")), _kb([[await _btn(s, u, "btn_how", "go:value")], sup])
 
     if step == "value":                     # "how it works", right after the subscription
-        return with_note(await t("value")), _kb([[await _btn(s, u, "btn_access", "go:register")], sup])
+        return with_note(await t("value")), _kb([[await _btn(s, u, "btn_access", "go:register")],
+                                                 [await _btn(s, u, "btn_faq", "faq:open")], sup])
 
     if step in ("register", "manual"):
         link = ref_link(cfg, u)
         rows = [[await _btn(s, u, "btn_register", url=link)] if link else [],
                 [await _btn(s, u, "btn_manual_id", "go:manual")] if step == "register" else [],
+                [await _btn(s, u, "btn_find_id", "faq:id"), await _btn(s, u, "btn_faq", "faq:open")],
                 [await _btn(s, u, "btn_why_new", url=cfg.video_new_account_url)] if cfg.video_new_account_url else [],
                 sup]
         text = await t("manual_id") if step == "manual" else await t("register")
@@ -222,7 +226,8 @@ async def render(s, cfg: Settings, u: User, step: str | None = None, note: str =
 
     if step == "deposit":
         rows = [[await _btn(s, u, "btn_deposit", url=cfg.open_url)] if cfg.open_url else [],
-                [await _btn(s, u, "btn_check_dep", "check:dep")], sup]
+                [await _btn(s, u, "btn_check_dep", "check:dep")],
+                [await _btn(s, u, "btn_faq", "faq:open")], sup]
         text = await t("deposit", acc_id=html.escape(u.acc_id), min_dep=f"{cfg.min_deposit_usd:g}")
         return (text + "\n\n" + note if note else text), _kb(rows)
 
